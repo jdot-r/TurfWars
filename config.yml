@@ -1,0 +1,6 @@
+# TurfWars config
+Prefix: §d[§9TW§d]§b
+Max_Players: 2
+Enable_PC_Arrow_Mechanics: false
+
+# Enable_PC_Arrow_Mechanics let the arrows move faster as they normally do, because arrows are dropping faster and flying slower as arrows on PC
