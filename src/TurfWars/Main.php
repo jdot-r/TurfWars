@@ -95,6 +95,18 @@ $this->REDSPAWN = ["x" => 534, "y" => 64, "z" => 1665];
 
 
 
+public function onDisable(){
+
+
+foreach($this->games as $game => $index){
+if($index["Status"] == "INGAME"){
+
+$this->deleteDirectory($this->getServer()->getDataPath() . "/worlds/" .$index["Arena"]);
+                $this->copymap($this->getDataFolder() . "/maps/TW-BACKUP", $this->getServer()->getDataPath() . "/worlds/" . $index["Arena"]);
+
+}}
+}
+
 
 
 
@@ -120,30 +132,36 @@ $signt = $sign->getText();
 
 if($signt[0] == "§d[§9TW§d]"){        
 
+
 $levelname = str_replace("§b", "", $signt[1]);
+
+$Status = $this->games[$this->getGameByLevel($levelname)]["Status"];
+
+
+if($Status > 5 || $Status == "JOINABLE") $st = "§fJoinable"; else $st = "§cIngame";
 
 if($this->getServer()->isLevelLoaded($levelname)){
 
 $players = $this->getServer()->getLevelByName($levelname)->getPlayers();
 
 if(!isset($players)){
-$sign->setText($signt[0], $signt[1], "§fJoinable", "§d0§e / §d".$this->MAX);
+$sign->setText($signt[0], $signt[1], $st, "§d0§e / §d".$this->MAX);
 }
 
 
 if(count($players) < 2 && $signt[2] == "§cIngame"){
 
-$sign->setText($signt[0], $signt[1], "§fJoinable", "§d0§e / §d".$this->MAX);
+$sign->setText($signt[0], $signt[1], $st, "§d0§e / §d".$this->MAX);
 
 
 }else{
 
-$sign->setText($signt[0], $signt[1], $signt[2], "§d".count($players)."§e / §d".$this->MAX);
+$sign->setText($signt[0], $signt[1], $st, "§d".count($players)."§e / §d".$this->MAX);
 }
 
 }else{
 
-$sign->setText($signt[0], $signt[1], "§fJoinable", "§d0§e / §d".$this->MAX);
+$sign->setText($signt[0], $signt[1], $st, "§d0§e / §d".$this->MAX);
 
 }}}
 }}
@@ -278,13 +296,19 @@ $lvl->setBlock(new Vector3($x + 1, 63, 1692), Block::get(159, 3));
 public function LeaveCheck($game, $team){
 
 
+$gameplayers = $this->getServer()->getLevelByName($this->games[$game]["Arena"])->getPlayers();
+
 $s = $this->games[$game]["Status"];
 
+if($s > 5 && count($gameplayers) < 3){
+$this->games[$game]["Status"] = "JOINABLE";
+return;
+}
 
 
-if($s === "INGAME" || $s === 5 || $s === 4 || $s === 3 || $s === 2 || $s === 1 || $s === 99 ){
 
-$gameplayers = $this->getServer()->getLevelByName($this->games[$game]["Arena"])->getPlayers();
+if($s === "INGAME" || $s === 5 || $s === 4 || $s === 3 || $s === 2 || $s === 1 || $s === "zero"){
+
 
 $red = 0;
 $blue = 0;
@@ -334,10 +358,13 @@ $player->sendMessage($this->PREFIX."Game was cancelled, to less players.");
 
 
 
-$this->ResetMap($this->games[$game]["Arena"]);
+$this->deleteDirectory($this->getServer()->getDataPath() . "/worlds/" .$this->games[$game]["Arena"]);
+                $this->copymap($this->getDataFolder() . "/maps/TW-BACKUP", $this->getServer()->getDataPath() . "/worlds/" . $this->games[$game]["Arena"]);
+
+}}
 
 
-}}}
+}
 
 
 
@@ -557,7 +584,7 @@ public function onMove(PlayerMoveEvent $event){
 if($this->inTurfWars($player = $event->getPlayer())){
 
 
-if($this->games[$this->getGameByPlayer($player)]["Status"] != "INGAME" &&  $this->games[$this->getGameByPlayer($player)]["Status"] != "JOINABLE"){
+if(!($this->games[$this->getGameByPlayer($player)]["Status"] == "INGAME" || $this->games[$this->getGameByPlayer($player)]["Status"] == "JOINABLE" || $this->games[$this->getGameByPlayer($player)]["Status"] > 5)){
 
 $event->setCancelled();
 
@@ -632,7 +659,9 @@ $this->updateTerrain($this->getGameByLevel($event->getEntity()->getLevel()->getF
 $victim->sendMessage($this->PREFIX."§dYou were killed by §c".$killer->getName());
 
 $killer->sendMessage($this->PREFIX."§dYou killed §a".$victim->getName());
+
 $event->setCancelled();
+
 
 if($this->getTeam($victim) == "Red"){
 $victim->teleport(new Vector3($this->REDSPAWN["x"], $this->REDSPAWN["y"], $this->REDSPAWN["z"]));
@@ -667,7 +696,7 @@ $this->getServer()->getLevelByName($levelname)->setTime(0);
 $this->getServer()->getLevelByName($levelname)->stopTime();
 
 }
-if($this->games[$this->getGameByLevel($levelname)]["Status"] == "JOINABLE"){
+if($this->games[$this->getGameByLevel($levelname)]["Status"] == "JOINABLE" || $this->games[$this->getGameByLevel($levelname)]["Status"] > 5){
 
 $this->GameSetup($player, $levelname);
 }else{
@@ -744,14 +773,27 @@ $player->sendMessage($this->PREFIX."Bow and Arrows were added to your inventory,
 // teleport player to spawn
 
 
-if(count($this->getServer()->getLevelByName($Arena)->getPlayers()) == $this->MAX){
+if(count($this->getServer()->getLevelByName($Arena)->getPlayers()) == 2/*$this->maps->get($Arena."_max")*/){
 
-$this->StartGame($Arena);
+$this->games[$this->getGameByLevel($Arena)]["Status"] = 80;
+
+
 
 
  // countdown
 }
-/* CLOSE GAME WHEN IT'S FULL */
+
+if(count($this->getServer()->getLevelByName($Arena)->getPlayers()) == $this->MAX){
+
+$this->StartGame($Arena);
+
+$this->games[$this->getGameByLevel($Arena)]["Status"] = 5;
+
+
+
+}
+
+
 
 }
 
@@ -762,7 +804,6 @@ $this->StartGame($Arena);
 
 public function StartGame($Arena){
 
-$this->games[$this->getGameByLevel($Arena)]["Status"] = 5;
 
 
 $players = $this->getServer()->getLevelByName($Arena)->getPlayers();
@@ -911,6 +952,10 @@ $this->games[$game]["BlueScore"] = $this->games[$game]["BlueScore"] + 1;
 if($this->games[$game]["RedScore"] - $this->games[$game]["BlueScore"] == 32){
 foreach($this->getServer()->getLevelByName($this->games[$game]["Arena"])->getPlayers() as $player){
 
+if($this->getTeam($player) == "Red"){
+$player->sendMessage($this->PREFIX." Your team won.");
+
+}
 
 $player->getInventory()->clearAll();
 $player->setNameTag($player->getDisplayName());
@@ -926,8 +971,8 @@ $this->games[$game]["RedScore"] = 0;
 $this->games[$game]["BlueScore"] = 0;
 
 
-$this->deleteDirectory($this->getServer()->getDataPath() . "/worlds/" . $this->games[$game]["Arena"]);
-                $this->copymap($this->getDataFolder() . "/maps/" . "TW-BACKUP", $this->getServer()->getDataPath() . "/worlds/" . $this->games[$game]["Arena"]);
+$this->deleteDirectory($this->getServer()->getDataPath() . "/worlds/" .$this->games[$game]["Arena"]);
+                $this->copymap($this->getDataFolder() . "/maps/TW-BACKUP", $this->getServer()->getDataPath() . "/worlds/" . $this->games[$game]["Arena"]);
 
 
 
@@ -941,6 +986,13 @@ $this->deleteDirectory($this->getServer()->getDataPath() . "/worlds/" . $this->g
 
 if($this->games[$game]["BlueScore"] - $this->games[$game]["RedScore"] == 32){
 foreach($this->getServer()->getLevelByName($this->games[$game]["Arena"])->getPlayers() as $player){
+
+
+
+
+$player->sendMessage($this->PREFIX." You got 4 coins for participation.");
+$this->getServer()->getPluginManager()->getPlugin("Auth")->addCoins($player, 4);
+
 
 $player->getInventory()->clearAll();
 $player->setNameTag($player->getDisplayName());
@@ -956,14 +1008,8 @@ $this->games[$game]["Status"] = "JOINABLE";
 $this->games[$game]["RedScore"] = 0;
 $this->games[$game]["BlueScore"] = 0;
 
-$this->deleteDirectory($this->getServer()->getDataPath() . "/worlds/" . $this->games[$game]["Arena"]);
-                $this->copymap($this->getDataFolder() . "/maps/" . "TW-BACKUP", $this->getServer()->getDataPath() . "/worlds/" . $this->games[$game]["Arena"]);
-
-}
-
-
-if($this->games[$game]["RedScore"] - $this->games[$game]["BlueScore"] == 32 || $this->games[$game]["BlueScore"] - $this->games[$game]["RedScore"] == 32){
-
+$this->deleteDirectory($this->getServer()->getDataPath() . "/worlds/" .$this->games[$game]["Arena"]);
+                $this->copymap($this->getDataFolder() . "/maps/TW-BACKUP", $this->getServer()->getDataPath() . "/worlds/" . $this->games[$game]["Arena"]);
 
 }
 
@@ -993,6 +1039,8 @@ $this->SignUpdate();
 foreach($this->games as $game => $value){
 
 $Arena = $value["Arena"];
+$level = $this->getServer()->getLevelByName($Arena);
+
 
 if($this->getServer()->isLevelLoaded($Arena)){
 
@@ -1038,74 +1086,47 @@ $player->sendPopup("§eWaiting for players...   §d".count($this->getServer()->g
 
 // SEND PLAYERS COUNTDOWN START MESSAGES
 
-}elseif($Status === 5){
+}elseif(is_numeric($Status) && $Status > 5){
+$this->games[$game]["Status"] -= 1;
 
- foreach($this->getServer()->getLevelByName($Arena)->getPlayers() as $player){
-$player->sendPopup("§7Starts in §a5 §7Seconds");
-$this->games[$this->getGameByLevel($Arena)]["Status"] = 4;
-// Cancel startcountdown when to less players
+if($Status < 16){
+ $c = "§c"; 
+}else{
+$c = "§a";
+}
+
+
+ foreach($level->getPlayers() as $player){
+
+$player->sendPopup("§7Starts in ".$c.gmdate("i.s", $Status - 5));
+
+}
+
+
+}elseif(is_numeric($Status) && $Status < 6){
+
+if(count($this->getServer()->getLevelByName($Arena)->getPlayers()) < $this->MAX && $Status == 5) $this->StartGame($Arena);
+
+
+
+if($Status == 1) $this->games[$game]["Status"] = "zero"; else $this->games[$game]["Status"] -= 1;
+
+ foreach($level->getPlayers() as $player){
+$player->sendPopup("§7Starts in §b".$Status." §7Seconds");
 
 
 }
 
 
 
-}elseif($Status === 4){
-
- foreach($this->getServer()->getLevelByName($Arena)->getPlayers() as $player){
-$player->sendPopup("§7Starts in §a4 §7Seconds");
-$this->games[$this->getGameByLevel($Arena)]["Status"] = 3;
+}elseif($Status == "zero"){
 
 
+$this->games[$game]["Status"] = "INGAME";
+ foreach($level->getPlayers() as $player){
+$player->sendPopup("§dGame has started!");
+$player->sendMessage($this->PREFIX."Game has started! Happy fighting!");
 
-// Cancel startcountdown when to less players
-
-}
-
-
-}elseif($Status == 3){
-
- foreach($this->getServer()->getLevelByName($Arena)->getPlayers() as $player){
-$player->sendPopup("§7Starts in §a3 §7Seconds");
-$this->games[$this->getGameByLevel($Arena)]["Status"] = 2;
-
-// Cancel startcountdown when to less players
-
-
-}
-
-
-
-}elseif($Status == 2){
-
- foreach($this->getServer()->getLevelByName($Arena)->getPlayers() as $player){
-$player->sendPopup("§7Starts in §a2 §7Seconds");
-$this->games[$this->getGameByLevel($Arena)]["Status"] = 1;
-
-
-// Cancel startcountdown when to less players
-
-
-}
-
-
-}elseif($Status == 1){
-
- foreach($this->getServer()->getLevelByName($Arena)->getPlayers() as $player){
-$player->sendPopup("§7Starts in §a1 §7Seconds");
-$this->games[$this->getGameByLevel($Arena)]["Status"] = 99;
-
-
-}
-
-
-
-}elseif($Status == 99){
-
- foreach($this->getServer()->getLevelByName($Arena)->getPlayers() as $player){
-$player->sendPopup("§dGame started!");
-$player->sendMessage($this->PREFIX."Game has started! Happy bow-shooting!");
-$this->games[$this->getGameByLevel($Arena)]["Status"] = "INGAME";
 
 
 
